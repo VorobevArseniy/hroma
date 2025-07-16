@@ -1,0 +1,45 @@
+# Пример кода на Hroma
+
+let module main
+
+let import  ( # Или без круглых скобок, если импорт один let import = hroma/io
+    hroma/files
+)
+
+let main = { # Особая функция, должна вернуть тип Result
+    let FILE_PATH = "./spec.hr"
+
+    let! result = read_file(FILE_PATH)
+    
+    match result of
+        Ok(text) -> echo "Your text: " <> text
+        Err(e) -> echo "Error reading file: " <> e
+    
+    Ok(_)
+}
+
+let! read_file = path: String -> {
+    let MAX_SIZE = 1024
+
+    let result = files.open(path)
+
+    match result of
+        Ok(handler) -> {
+            let content_result, file_handler = files.read(handler, MAX_SIZE)
+            let _ = files.close(file_handler)
+
+            match content_result of
+                Ok(text) -> Ok(text)
+                Err(e) -> Err("Read failed: "<> e)
+        }
+        Err(e) -> Err("Open failed: " <> e)
+}
+
+let! factorial = n: Int -> 
+    let! new_n = n
+    match new_n of
+        0 -> 1
+        1 -> 1
+        _ -> factorial(new_n) * new_n
+
+
