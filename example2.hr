@@ -1,9 +1,62 @@
-let module main
+module main
 
-let import = (
-    hroma/http
+import (
+    psql/driver
 )
 
+: () -> Result IO()
 let main = {
-    
+    match connect (5432, "localhost") of
+        Ok db ->
+            let query1_result, db2 = query (db, "SELECT * FROM foo")
+            let query2_result, db3 = query (db2, "SELECT * FROM bar")
+            
+            handle_query_result (query1_result, "foo")
+            handle_query_result (query2_result, "bar")
+            
+            io.puts "Operations completed"
+        Err e -> io.puts $ "Connection failed: " <> e
 }
+
+
+handle_query_result : (Result (String, String), String) -> IO String
+let handle_query_result = result, query_name ->
+    match result of
+        Ok data -> io.puts $ "Data from " <> query_name <> ": " <> data
+        Err e -> io.puts $ "Query " <> query_name <> " failed: " <> e
+
+let type DB = {
+    Database {port: Int, address: String}
+}
+
+impl Drop for DB = {
+    drop = db ->
+        match db of
+            Database {port, address} -> driver.close_connection (port, address)
+}
+
+connect : (Int, string) -> Result (DB, String)
+let connect = port, address ->
+    match driver.connect (port, address) of
+        Ok _ -> Ok (Database {port, address})
+        Err e -> Err ("Error connecting to database: " <> e)
+
+query : (DB, String) -> (Result (String, String), DB)
+let query = db, query_string -> 
+    match db of
+        Database {port, address} ->
+            match driver.exec Query {db_port: port, db_address: adress, query_string: query_string} of
+                Ok r -> (Ok ("Query result: " <> show r), Database {port, address})
+                Err e -> (Err ("Qury error: "<> show e), Database {port, address})
+
+map : (a -> b, List a) -> (List b, List a) where a, b: NonLin
+let req map = f, l ->
+    match l of
+        [] -> ([], l)
+        [x, ..xs] -> {
+        ^- a ^- List a
+            let y = f x # x: NonLin, так как в List a, где a: NonLin
+            let ys, xs' = map f xs
+            ([y, ..ys], [x, ..xs'])
+        }
+

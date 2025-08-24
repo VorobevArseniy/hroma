@@ -1,47 +1,50 @@
 # Определяем название модуля
-let module main
+module main
 
 # Импортируем стандартный модуль
-let import hroma/io 
+import hroma/io 
 # Если импортов несколько:
-# let import (
+# import (
 #   hroma/io
 #   hroma/lists
 #   hroma/files
 # )
+#
+
 
 # Определяем основную функцию
+main : () -> IO string
 let main = {
-    # Стоит отметить, что литералы чисел, строк и других стандартных типов в чистом виде в Hroma не являются константами,
-    # это анонимные нульярные функции, которые нельзя вызвать. Это никак не влияет на производительность,
-    # однако это подкрепляет философию языка - все это функции (ну кроме констант)
+    # Тип для нульярных функций может быть выведен автоматически
+    let greeting = "Hello, World!"
+        ^-- () -> String
+    io.puts greeting # >> Hello, World!
 
-    io.println(bar) # Если функция нульярна (не имеет аргументов), то ее вызов не нуждается в круглых скобках
-    # io.println(bar()) === io.println(bar)
-    
-    let baz = 42
+    # ---
 
-    # Ошибка компиляции! Так как в таком случае функция baz() вызывается дважды
-    # Так же стоит отметить, что Hroma позволяет shadowing речь об этом пойдет далее
-    let bar = baz + baz
+    put_expr : String -> IO String
+    let put_expr = x -> io.puts x
+    put_expr $ "Hello, " <> "World!" # or put_expr ("Hello, " <> "World!")
 }
 
 ---
 # В Hroma все значения - это функции
 # Для создания функции используется ключевое слово let:
-let foo = 42 # Создает функции foo(), которая возвращает 42
+let foo = 42 # Создает функции foo (), которая возвращает 42
 
-# Для создания функции, принимающей 1 и более аргументов:
-let bar = a: Int, b: Int -> a + b 
-# Если аргументы имеют одинаковый тип, то повторное указание типа можно опустить:
-let baz = a, b: String -> a <> b # Оператор конкатинации строк, речь об операторах пойдет дальше
-# Аргументы у всех функций являются линейными функциями! 
-let fn_with_error = a, b: Int -> { # Если тип у аргументов повторяется, каждый раз его можно не указывать (a -> Int, b -> Int)
-    let foo = a + 42
-    foo + a # Ошибка! a() была использована дважды. Ошибка! b() Не была использована
-}
+# В Hroma функции могут принимать только один аргумент
+: Int -> Int # Nameless bind - сигнатура применится к следующей функции
+let bar = x -> x + 42
 
-# Синтаксис многострочных функций
+# Если нужно передать пару аргументов:
+: (Int, Int) -> Int
+let sum = x, y -> x + y # Скобки писать не нужно
+# Тогда вызов функции будет выгядеть так:
+sum (40, 2)
+
+
+# Синтаксис многострочных функций (императивный стиль)
+: () -> Int
 let multiline_fn = {
     let foo = 24
     let bar = foo * 2
@@ -49,153 +52,125 @@ let multiline_fn = {
     bar # В Hroma нет ключего слова return, как во многих ЯП
 }
 
-# По умолчанию в Hroma все функции линейны, а значит их можно использовать один и только один раз:
+# Линейность в Hroma:
+
 let some_fn = {
-    let foo = 42
-    let bar = 42
-    foo # Ошибка! функция bar не была использована
-}
+    let foo = files.open "foo.txt"
 
-let some_fn2 = {
-    let foo = 42
-    let bar = foo
-    let baz = foo + bar # Ошибка! Функция foo была использоваана дважды
+    let line1, _  = files.get_line (foo, 1)
+    let line2, _ = files.get_line (foo , 2) # foo использован дважды!
 
-    baz 
-}
+    # Правильным будет:
+    # let line1, foo2 = files.get_line (foo, 1)
+    # let line2, _ = files.get_line (foo2, 2)
 
-# Если вы хотите создать нелинейную функцию, то вам нужен синтаксис let! :
-let! nonlinear_fn = 42
+    (line1, line2)
+} # В языке есть RAII, поэтому файл вручную закрывать не надо
 
-let linear_fn = nonlinear_fn + nonlinear_fn # Ошибки нет
+# Многие стандартные примитивные типы имеют NonLin trait
+let foo = 42
 
-# Хотя функции называются нелинейными, единственное их отличие, это возможность переиспользования.
-# Их аргументы по прежнему линейные функции, возращаемые фунции тоже линейны:
-let! nonlin_fn = 42
-let res = nonlin_fn # res нелинейная функция!
-let foo = res + res # Ошибка!
+let bar = foo + foo # Они удаляются из памяти нетривиальным образом
 
-let! nonlin_fn = a, b: Int -> a # Ошибка! Функция b() не использована
-
-# Нелинейные функции это основной инструмент для создания пользовательских API:
-let! query_db = db: Database, query: String -> {
-    let! new_db = db # Берем функцию db() во "владение" нашей функции
-
-    let result, _ = driver.query_db(new_db, query)
-
-    match result of
-        Ok(row) -> (row, new_db)
-        Err(e) -> ("Error query database: " <> e, new_db)
-}
-
-let db = driver.connect("localhost")
-
-let res, db2 = query_db(db, "SELECT * FROM foo")
-# let res, db3 = query_db(db, "SELECT * FROM baz") # Ошибка! db() использована 2 раза
-let res2, db3 = query_db(db2, "SELECT * FROM bar")
-
-let _ = driver.close(db3)
-
-# Если вы создадите нелинейную функцию и используете менее 2 раз, то компилятор выдаст предупреждение
-let foo = {
-    let! bar = 42
-    let baz = bar
-    baz # Предупреждение! bar() использована 1 раз. Возможно стоит определить эту функцию, как линейную
-}
-
-# (На будущее)
-# Нелинейные функции объявленные на верхнем уровне модуля автоматически будут доступны извне
-
+# Нужно быть очень акуратными с NonLin trait и не использовать его для ресурсов, иначе могут случиться утечки памяти
 ---
 
 ---
 
 # Анонимные функции:
 
-let -> {...} # Анонимная нульярная функция
+\ -> {...} # Анонимная функция с Unit параметром
 
-let (a, b) -> {...} # Анонимная ненульярная функция
+\x -> {...} # Анонимная функция с параметром
 
-# стоит отметить, что анонимные функции Вы будете использовать в качестве коллбэков (callback),
-# поэтому типы аргументов указывать в таких функциях не нужно. По сути, анонимные функции являются замыканиями
-# 
-# В остальных случаях указывать тип аргументов является необходимостью
-let applicate = x: Int, callback: (Int -> Int) -> callback(x)
-let foo = applicate(42, let (a) -> a) # >> 42. В данном случае функция a() автоматически будет иметь тип Int
 ---
 
 ---
 
 # Типы данных:
-# В Hroma есть ряд встроенных типов: Int, Float, String, Bool, List(T), Result(T, E), Tuple(..T), Record(..K: T), Pair
-# Так как в Hroma - все это функции (кроме констант), эти типы обозначают сигнатуру функции.
+# В Hroma есть ряд встроенных типов: Int, Float, String, Bool, List T, Result (T, E), Record{}, Pair (A, B) и другие
 
-# Однако, если в аргумент вы хотите передать ненульярную функцию, то вы можете использовать синтаксис a -> b, где 'a' и 'b' это
-# другие типы
+# Records:
+# создать запись можно с помощью литерала {}:
+let my_record = {foo: 42, bar: "42"} # В таком случае тип записи выведется автоматически 
+#   ^-- () -> Record{foo: Int, bar: String}
 #
-# Если функция, которую вы передаете в аргумент ненульярна, то ее сигнатуру можно указать подобным образом:
-let! factorial = n: Int, cont: (Int -> Int) -> # Пример линейной рекурсии
+# Получить данные записи можно через . :
+let foo = my_record.foo 
+#   ^-- () -> Int
+#
+# Если запись нелинейна, то получать ее данные таким образом можно несколько раз
+# Если запись линейна, то получение ее данных таким образом поглотит саму запись, и получить другие данные не получится
+# Если надо получить все данные линейной записи, то необходимо воспользоваться pattern matching:
+let lin_record = LinRecord {foo: LinType, bar: LinType}
+
+: LinRecord -> ...
+let baz = lr ->
+    match lr of
+        LinRecord {foo, bar} -> {...}
+
+baz lin_record # линейный ресурс поглощен
+
+# Type alias
+
+: (Int, (Int -> Int)) -> Int
+let req factorial = n, cont -> 
     match n of
-        0 -> cont(1)
-        _ -> factorial(n - 1, let (result) -> cont(n * result))
-# Удобнее будет вынести в отдельный тип:
+        0 -> cont 1
+        _ -> factorial (n - 1, \result -> cont $ n * result)
+# Удобнее будет вынести в отдельный alias тип:
 let type Cont = Int -> Int
-let! falctorial = n: Int, cont: Cont -> {...}
 
-# Так же Hroma поддерживает кастомные типы:
-let type MyResult = Result(Bool, String) # Типы обязательно пишутся с большой буквы!
-let f -> MyResult = val: Int  -> {match val of ...}
+: (Int, Cont) -> Int
+let req factorial = n, cont -> {...}
 
-# Кастомными типами так же могут быть примитивные типы:
-let type MyString = String
+# Result type alias
+let type MyResult = Result (Bool, String) # Типы обязательно пишутся с большой буквы!
 
-# Так же можно задать несоклько вариантов одному типу
-let type MyType = (
+f : MyResult -> ...
+let f = val -> {match val of ...}
+
+# Так же можно задать несоклько вариантов одному типу (ADT)
+let type MyType = {
     Foo,
     Baz,
     Bar
-)
+}
 # Затем это удобно использовать в pattern match
-let f = variant: MyType ->
+f : MyType -> String
+let f = variant ->
     match of variant
         Foo -> "foo!"    
         Bar -> "bar!"
         Baz -> "baz!"
         _ -> "sad"
-let _ = io.println(f(Foo)) # >> foo!
+io.puts $ f Foo # >> foo!
 
-# Так же есть возможность объявить свой Record
-let type MyRecordType = (
-    Foo(data: String, another_data: String)
-    Bar(data, another_data: String, life: Int)
-)
+# В конструкторах вариантов можно использовать любые типы
+let type MyADT = {
+    Foo {data: String, another_data: String} 
+    Bar (Int, String)
+    Baz List Int
+}
 
-let handle_record = record: MyRecordType -> 
+: MyRecordType -> IO String
+let handle_record = record -> 
     match record of
-        Foo(data, another_data) -> io.println("Your data: " <> data <> " " <> another_data)
-        Bar(_, _, life) -> io.println("Life: " <> life) # Варианты можно пропускать
+        Foo {data, another_data} -> io.puts $ "Your data: " <> data <> " " <> another_data
+        Bar (baz, _) -> io.puts $ "Baz?: " <> baz # Варианты можно пропускать
+        Baz list -> lists.foldl (print, list)
 
 
-handle_my_record(Bar("foo", "bar", 42)) # >> 42
-
-# Аргументам функций необходимо явно указывать типы:
-let f = a: String -> io.println(a) # Важно отметить, что io.println() возвращает функцию обратно, поэтому мы можем использовать let
-# let g = f("foo") # Функция g теперь возвращает foo
-
-# Если типы аргументов одинаковы, томожно не писать тип отдельно каждому аргументу:
-let f1 = a, b: Int -> io.println(a + b)
+handle_my_record $ Bar ("bar", 42) # >> Baz?: bar
 ---
 
 ---
 # Математические операторы:
-# Итог любой операции, с использованием математических операторов - это всегда функция. Можно мысленно предстваить,
-# что весь блок операций, это одна анонимная нульярная функция, возвращающая в итоге результат. А как мы знаем, в Hroma все функции 
-# возвращают только функции.
 
 # Операторы в Hroma не имеют перегрузок:
 # Операторы для Int: 
 # Арифметические: [+, -, /, *, %]
-# Операторы сравнения: [<, >, >=, <=]
+# Операторы сравнения: [<, >, >=, <=, ==]
 #
 # Операторы для Float: 
 # Арифметические: [+. , -. , /. , *. , %.]
@@ -205,115 +180,88 @@ let f1 = a, b: Int -> io.println(a + b)
 # Оператор конкатинации: <>
 
 # Оператор сравнения работает с любыми типами:
-io.println(42 == 42) # >>true
-io.println("42" == "42") # >>true
-io.println(42 == "42") # Ошибка!
-# Выдает ошибку при несоответствии!
+io.puts $ 42 == 42 # >>true
+io.puts $ "42" == "42" # >>true
+io.puts $ 42 == "42"  # Ошибка компилятора!
+# Выдает ошибку при несоответствии типов!
 ---
 
 ---
 
 # Коллекции (списки):
 let list = [0, 1, 2] # Это функция, которая создаст список.
-# Такой список будет иметь тип List(Int)
+# Такой список будет иметь тип List Int
+# List не реализует NonLin trait
 
 # Hroma имеет встроенные функции для работы со списками в модуле hroma/lists:
 let list = [42, 42, 42]
 
-let len, list = lists.len(list1) # Так как в Hroma функции линейны, после использования в функции len
-# функция list() будет недоступна. Поэтому len (как и многие другие функции) возвращает заново новую функцию с исходным списком
-# Если вам не нужна функция со списком обратно вы можете сделать let len, _ = len(list)
-# Стоит отметить, в Hroma все переменные неизменяемы. В данном примере мы не изменяем переменную, а переопределяем, о этой
-# особенности пойдет речь далее
-#
-
+let len, list = lists.len list1 # Так как в Hroma списки линейны, после использования в функции len
+# list будет недоступен. Поэтому len (как и многие другие функции) возвращает заново новую функцию с исходным списком
+# Если вам не нужна функция со списком обратно вы можете сделать let len, _ = len list
 ---
 
 ---
 # Pattern matching
 
 # Пример pattern matching:
-let matcher = a: Int -> # Result(String, String)
+: Int -> Result (String, String)
+let matcher = a -> # Result (String, String)
     match a of
-        0 -> Ok("Sad")
-        42 -> Ok("Good")
-        _ -> Err("Bad")
+        0 -> Ok "Sad"
+        42 -> Ok "Good"
+        _ -> Err "Bad"
 
 # Затем можно использовать так:
-let foo = res: Result(String, String) -> { # Скобки не обязательны !
+: Result -> IO String
+let foo = res ->
     match res of
-        Ok(val) -> io.println("Result: " <> val)
-        Err(err) -> io.println("Error: " <> err)
-        _ -> io.println("Unexpected error")
-}
+        Ok val -> io.puts $ "Result: " <> val
+        Err err -> io.puts $ "Error: " <> err
+        _ -> io.puts "Unexpected error"
 
-# pattern matching кортежей (Tuple):
-let tuple = ("Dog", "Cat")
+# pattern matching пар:
+let pair = ("Dog", "Cat")
+#   ^-- () -> Pair(String, String)
 
-let result = match tuple of
+io.puts $ 
+    match pair of
     "Cat", "Cat"  -> "Both are cats"
     _, "Dog" -> "Second is dog"
     _, _ -> "Neither cat nor dog"
 
 # pattern matching строк:
 let string = "Hello, Hroma"
-let get_name = x: String ->
-    let! new_x = x
-    match new_x of
-        "Hello, " <> lang -> (lang, new_x) # это создаст функцию lang() -> String, которая будет возвращать остаток после "Hello, "
-        _ -> ("Unknown", new_x) # Возвращать обратно аргумент является хорошей практикой
+: String -> String
+let get_name = x ->
+    match x of # String не имеет Copy trait
+        "Hello, " <> lang -> lang # это создаст функцию lang -> String, которая будет возвращать остаток после "Hello, "
+        _ -> "Unknown"
 
-let name, _ = get_name(string)
-io.println(name) # >> Hroma
+io.puts (get_name string)
 
 # list pattern matching:
 let list = [1, 2, 3]
 
-let match_list = l: List(int) ->
+: List Int -> String
+let match_list = l ->
     match l of
         [1] -> "Список состоит только из 1"
         [1, .., 3] -> "Список начинается с 1, заканчивается 3"
         [_, _] -> "Список состоит только из 2 элементов"
         _ -> "Любые другие варианты"
 
-io.println(match_list(list)) # >> "Список начинается с 1, заканчивается 3"
+io.puts $ match_list list # >> "Список начинается с 1, заканчивается 3"
 
 ---
 
 
 ---
 
-# shadowing
-
-# Так как в Hroma часто приходится переопределять функции, в языке присутсвует shadowing:
-let a = 42
-foo(a)
-let a = 0 # Ошибки не будет. Мы не изменили переменную, а создали новую с тем же именем. Старая при этом удаляется
-
-# Однако важно уточнить, что перед тем, как переопределить функцию, она обязана быть использована до этого
-let sorted_list, list = lists.sort(list) # Ошибки нет, так как прямо перед определением функция list была использована
-
-# let list = [42]
-# let list = [0] -- Ошибка! Функция переопределена до ее использования
-#
-
-# Аргументы функций нельзя переопределить: let foo = a -> {
-#    let a = 42 -- Ошибка!
-#}
-
-# let len, _ = lists.len(list)
-# let filtered, _ = lists.filter(list, let (x) -> {...}) # Ошибка!! Функция list использована дважды
----
-
-
----
-
-# Tuple
-
-let tuple = ("42", 42, 42.0, [42]) # Tuple(Stirng, Int, Float, List(Int))
-
+# Tuple (Pair)
 # В Hroma вы часто будете сталкиваться с тем, что функция возращает 2 функции -> результат и функцию обратно
-let f = a, b: Int -> (b, a + 1) # Тип Tuple(Int, Int)
+: (Int, Int) -> (Int, Int)
+let f = a, b -> (b, a + 1) # Тип (Int, Int)
 
 # Пример многострочной функции
 let fn = {
@@ -327,25 +275,98 @@ let fn = {
 ---
 
 # Pipe-операторы
-let list = [1, 2, 3]
 
+# Императивный стиль:
+let list = lists.concat ([1, 2, 3, 4, 5], [1, 2])
+list len, _ = lists.len list
+io.puts len
 
-let len, _ = list # Pipe оператор возращает результат последней функции.
-    |> lists.filter(let (a) -> a % 2 != 0) # передает в первый аргумент
-    |> lists.len
-let _ = io.println(len) # >> 2
-# Важно! Если функция возращает несколько результатов (Tuple), то выберается первый элемент кортежа
-# Record же передается целиком, что стоит учитывать
+# Можно заменить на:
 
-# Без pipe оператора данная операция выглядела бы так
-# let sorted_list, list1 = lists.sort(list, let (a) -> a % 2 != 0)
-# let len, _ = lists.len(list1)
-
-
-# В Hroma правильно будет всегда учитывать, что функция будет использована в pipe операторе, поэтому желательно всегда
-# выностить функцию, над которой будут проводится операции в первый аргумент, однако pipe оператор в Hroma позволяет подставлять
-# результат предыдущей операции в необходимый по счету аргумент, хотя, опять же, так делать не желательно
-let foo, list = list
-    |> bar(42, _)
+([1, 2, 3, 4, 5], [1, 2])
+    ||> lists.concat # эквивалентно lists.concat ([1, 2, 3, 4, 5], [1, 2]) эта функция вернет только новый список
+    |> lists.len # эквивалентно lists.len [1, 2, 3, 4, 5, 1, 2] эта функция вернет длину списка и поглощенный список обратно
+    |> io.puts # >> 7
+    # Хотя предыдущая операция возвращает (Int, List Int), вторая позиция в паре отбрасывается 
+    # (так же, как и при let len, _ = lists.len list),
+    # если нужно ее сохранить, то используйте ||>
+---
 
 ---
+# Трейты (Traits):
+# В Hroma есть система трейтов для ADT типов.
+# Один из стандартных трейтов это NonLin
+
+# Для того, чтобы использовать NonLin, каждый вариант ADT должен содержать только нелинейные типы:
+let type NonLinADT = {
+    Foo
+    Bar String
+    Baz {foo: Int, bar: String} # Все варианты имеют нелинейные типы
+} deriving (NonLin) # Для такого типа будет автоматический нетривиальный drop
+
+main : IO String
+let main = {
+    let my_baz = Baz {foo: 42, bar: "42"}
+    
+    let bar = my_baz.foo + my_baz.foo
+
+    io.puts bar # >> 84
+    # my_baz дропнется целиком при выходе из скоупа
+}
+
+# По умполчанию, все ADT линейны, поэтому для создания линейного ресурса необходимо просто создать нужный тип
+let type Resource = {
+    Resource {id: String} 
+}
+
+# Если тип не реализует NonLin trait, то ему необходимо вручную реализовать Drop trait
+impl Drop for LinResource = {
+    drop = { id } ->
+        unsafe_drop_resource id
+        # id очистится автоматически при выходе из скоупа
+}
+
+: Resource -> Int
+let use_resource = res ->
+    match res of
+        { foo } -> foo + 42
+
+main : () -> IO String
+let main = {
+    let my_resource = Resource {id: 42}
+
+
+    use_resource my_resource # ресурс поглащен
+    # На этом моменте автоматически вызовется кастомный drop
+}
+
+# Кастомные traits:
+let trait Show = {
+    show : Self -> String # Self особый тип
+}
+
+let type Foo = {
+    Foo (String, String)
+} 
+
+impl Show for Foo = {
+    show = a, b -> a <> " and " <> b
+}
+
+: () -> IO String
+let main = {
+    let my_foo = Foo ("baz", "bar")
+
+    let show_result = show my_foo 
+
+    io.puts show_result # >> "baz and bar"
+}
+
+# Traits для полиморфных параметров (generics) (на будущее):
+let type Result (T, E) = {
+    Ok T
+    Err E    
+}
+# Если оба параметра нелинейны, то результат является нелинейным
+auto NonLin for Result T E where T: NonLin, E: NonLin
+# Если все параметры реализуют один и тот же трейт, то можно писать так:
