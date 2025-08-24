@@ -7,7 +7,7 @@ import (
     hroma/io
     # hroma/files.(open)
 )
-# import hroma/lists - if you have only one import, parantheses could be avoided
+# import hroma/lists - if you have only one import, parentheses could be avoided
 
 main : IO () # Declare a main function signature
 let main = { # Declare main function
@@ -20,7 +20,7 @@ let main = { # Declare main function
 
     # Function signature with () (Unit) param could be avoided. Function type would infer its return type
     let baz = foo "Your number is: " 
-    #             ^--- Parantheses in function call should be avoided
+    #             ^--- parentheses in function call should be avoided
     #   ^--- String
 
     # Last expression or fuction call will be the return, no return keyword needed
@@ -34,7 +34,7 @@ let inc = n -> n + 1
 # By default, all modules's functions are private
 : List Int -> List Int
 let! pub_fn = list -> {
-    let new_list, _ = map (inc, list) # Parantheses can be avoided with $ operator: map $ inc list
+    let new_list, _ = map (inc, list) # parentheses can be avoided with $ operator: map $ inc list
 
     # map function returns a Pair, that you can directly unwrap in let statement
     # You can discard function result with _ (underscore) operator
