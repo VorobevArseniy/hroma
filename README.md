@@ -1,3 +1,4 @@
+```
 module main # Define module's name
 # Module should be named in lowercase
 
@@ -214,3 +215,4 @@ io.puts len
     # (same as let len, _ = lists.len list)
     # If you need to preserve whole pair, use ||> operator
     # если нужно ее сохранить, то используйте ||>
+```
