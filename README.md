@@ -144,3 +144,7 @@ auto NonLin for Either E, T where E: NonLin, T: NonLin
 auth Drop for Either E, T where E: NonLin, T: NonLin
 # In previous example List didn't have auto NonLin, that is why `xs` is linear
 ```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
