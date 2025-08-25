@@ -61,7 +61,7 @@ impl Drop for DBConnection = {
 : IO () # nameless (implicit) signature bounding
 let main = {
     let db = psql.open "localhost:5432" # `db` is of linear type DBConnection
-    let result, _ = psql.query (db, "SELECT * FROM users")
+    let result, db2 = psql.query (db, "SELECT * FROM users")
     # `db` is consumed by `query` and is no longer available here
     io.puts (show result)
     # `drop` is called automatically here if the resource hasn't been consumed
@@ -118,4 +118,29 @@ impl Show for User = {
 let user = User {name: "Alice", age: 30}
 io.puts (show user) # "Alice (30 years old)"
 
+```
+
+## Polymorphic (generic) functions and types
+
+```hroma
+map : ((a -> b), List a) -> (List b, List a) where a: NonLin
+let rec map = f, l ->
+    match l of
+        [] -> ([], [])
+        [x, ..xs] -> {
+            let y = f x # `x` is not consumed because we ensure that `x` is not linear in type constraint
+            let ys, xs' = map (f, xs) # `xs` is consumed because List doesnt have NonLin trait
+
+            ([y, ..ys], [x, ..xs'])
+        }
+
+let type Either E, T = { # Same thing as Result but with different name
+    Left E
+    Right T
+}
+# Automatically make type derive NonLin if both types have NonLin trait
+auto NonLin for Either E, T where E: NonLin, T: NonLin
+# Same with Drop trait
+auth Drop for Either E, T where E: NonLin, T: NonLin
+# In previous example List didn't have auto NonLin, that is why `xs` is linear
 ```
