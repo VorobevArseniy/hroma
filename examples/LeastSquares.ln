@@ -1,0 +1,20 @@
+module leastsquares
+
+import (
+    "linea/math"
+)
+
+: IO ()
+let main = least_squares_difference
+    |> show
+    |> io.puts # >> 501
+
+: Int
+let least_squares_difference = find_number 1
+
+: Int -> Int
+let rec find_number = n ->
+    match ((math.pow_int (n, 2)) - (math.pow_int ((n - 1), 2))) > 1000 of
+        true -> n
+        false -> find_number (n + 1)
+

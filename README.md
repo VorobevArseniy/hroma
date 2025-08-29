@@ -1,11 +1,11 @@
-**Hroma** is a statically-typed functional programming language for building reliable and efficient applications. Its core innovation is a default-linear type system that guarantees resource safety without sacrificing expressiveness, combined with an elegant syntax that blends the power of mathematical foundations with practical simplicity.
+**Linea** is a statically-typed functional programming language for building reliable and efficient applications. Its core innovation is a default-linear type system that guarantees resource safety without sacrificing expressiveness, combined with an elegant syntax that blends the power of mathematical foundations with practical simplicity.
 
-> Hroma is under active development
+> Linea is under active development
 > syntax is the subject to change
 
 ## Philosophy
 
-Hroma is built on three core principles:
+Linea is built on three core principles:
 
 1. Safety by Default: Linear types eliminate resource management errors (use-after-free, double-free) at compile time. (No GC at all!)
 
@@ -31,21 +31,22 @@ Hroma is built on three core principles:
 
 ## Your first programm
 
-```hroma
+```linea
 module main
 
-import hroma/io
+import linea/io
 
 main : IO ()
 let main = {
     let message = "Hello, World!"
+
     io.puts message
 }
 ```
 
 ## Resource safety with Linear Types
 
-```hroma
+```linea
 # A linear type representing a database connection
 let type DBConnection = {
     Database String
@@ -68,18 +69,19 @@ let main = {
 
 
     # or with pipe composition
-    "localhost:5432"
-        |> psql.open
-        |> psql.query "SELECT * FROM users"
-        |> show
-        |> io.puts
+    # "localhost:5432"
+    #   |> psql.open
+    #   |> psql.query "SELECT * FROM users"
+    #   |> show
+    #   |> io.puts
+    #   ^--- drop will be called at the end of the pipe chain
 }
 ```
 
 ## Error Handling with `Result` and `match`
 
-```hroma
-import hroma/result
+```linea
+import linea/result
 
 : (Int, Int) -> Result (Int, String)
 let safe_divide = a, b ->
@@ -97,7 +99,7 @@ match result of
 
 ## Defining and Using Traits (Typeclasses)
 
-```hroma
+```linea
 # Define a trait for types that can be represented as a String
 let trait Show = {
     show : Self -> String
@@ -122,23 +124,23 @@ io.puts (show user) # "Alice (30 years old)"
 
 ## Polymorphic (generic) functions and types
 
-```hroma
+```linea
 map : ((a -> b), List a) -> (List b, List a) where a: NonLin
 let rec map = f, l ->
     match l of
         [] -> ([], [])
         [x, ..xs] -> {
             let y = f x # `x` is not consumed because we ensure that `x` is not linear in type constraint
-            let ys, xs' = map (f, xs) # `xs` is consumed because List doesnt have NonLin trait
+            let ys, new_xs = map (f, xs) # `xs` is consumed because List doesn't have NonLin trait
 
-            ([y, ..ys], [x, ..xs'])
+            ([y, ..ys], [x, ..new_xs])
         }
 
-let type Either E, T = { # Same thing as Result but with different name
+let type Either E, T = { # Same as Result but with different name
     Left E
     Right T
 }
-# Automatically make type derive NonLin if both types have NonLin trait
+# Automatically make type derive NonLin if both generics have NonLin trait
 auto NonLin for Either E, T where E: NonLin, T: NonLin
 # Same with Drop trait
 auth Drop for Either E, T where E: NonLin, T: NonLin

@@ -1,0 +1,52 @@
+module towersofhanoi
+
+import (
+    "linea/lists"
+)
+
+let type Moves = List (String, String)
+
+let type State = {
+    State {
+        num_disks : Int
+        from      : String
+        to        : String
+        using     : String
+        moves     : Moves
+    }
+} deriving (Drop)
+
+hanoi : State -> Moves
+let rec hanoi = state ->
+    match state of
+        State {num_disks, from, to, using, moves} ->
+            match num_disks of
+                r -> (moves, [(from, to)]) ||> lists.concat 
+                _ -> {
+                    : Moves
+                    let moves1 = hanoi (
+                        State {
+                            num_disks: (num_disks - 1),
+                            from,
+                            to: using,
+                            using: to,
+                            moves
+                        }
+                    )
+
+                    : Moves
+                    let moves2 = (moves1, [(from, to)]) ||> lists.concat
+
+                    hanoi(
+                        State {
+                            num_disks: (num_disks - 1),
+                            from: using,
+                            to,
+                            using: from,
+                            moves: moves2
+                        }
+                    )
+                }
+
+: State
+let start = State {num_disks: 0, from: "A", to: "B", using: "C", moves: []}

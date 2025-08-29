@@ -4,7 +4,7 @@ module main # Define module's name
 import (
     # Here your import modules
     hroma/io
-    # hroma/files.(open)
+    # hroma/files
 )
 # import hroma/lists - if you have only one import, parantheses could be avoided
 
@@ -140,6 +140,8 @@ let type MyType = {
     Baz Int
     Bar {a: Int, b: String}
 } deriving (Drop) # Standart Drop trait satisfies only if all of its variants consists of NonLin types
+# or types that already satisfy Dtop type
+# Without neither Drop nor NonLin trait you must implement Drop trait yourself!
 
 
 # Record field dot-accessing will consume whole record if record in linear
@@ -147,12 +149,12 @@ let foo = Bar {a: 42, b: "42"}
 let bar = foo.a # foo is consumed here
 let baz = foo.b # Compiler error: Linear type used twice
 
-# If you need to acces all fields you must use pattern matching:
+# If you need to access all fields you must use pattern matching:
 let fred = Bar {a: 42, b: "42"}
 match fred of
     Bar {a, b} -> io.puts (b <> show a)
 
-# If you need non linear ADT you can derive NonLin trait:
+# If you need non-linear ADT you can derive NonLin trait:
 let type MyNonLinType = {
     Bar {foo: Int, bar: String}
 } deriving (NonLin)
@@ -168,6 +170,7 @@ let type Either E, T = {
 }
 
 auto NonLin for Either E, T where E: NonLin, T: NonLin
+auto Drop for Either E, T Where E: Drop, T: Drop
 
 # Type constraints should also be used in polymorphic function signature
 
@@ -196,6 +199,30 @@ let program = {
     # after that db connection will be auth close
 }
 
+# Custom traits:
+# To declare a custom trait you need to use trait declaration:
+let trait Show = {
+    show : Self -> String
+            ^--- special type for traits
+}
+# Then lets create custom type and implement a custom Show trait
+
+let type FooBaz = {
+    FooBaz (String, String)
+}
+
+# Use `impl Trait for Type` construction for trait implementation
+impl Show for FooBaz = {
+    let show = fb ->
+        match fb of
+            FooBaz (a, b) -> a <> " and " <> b
+}
+
+# Then we can use show fuction on FooBaz:
+let foo_baz = FooBaz ("Foo", "Baz")
+io.puts (show foo_baz) # "Foo and Baz"
+
+
 # Pipe-operator:
 
 # Imperative style:
@@ -212,5 +239,5 @@ io.puts len
     |> io.puts # >> 7
     # Though previous operation returns (Int, List Int), second slot in the pair is discarded
     # (same as let len, _ = lists.len list)
-    # If you need to preserve whole pair, use ||> operator
-    # если нужно ее сохранить, то используйте ||>
+    # If you need to preserve whole pair, use ||> (pair-pipe) operator
+

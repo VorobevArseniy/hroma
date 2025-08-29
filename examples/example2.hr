@@ -19,6 +19,26 @@ let main = {
 }
 
 
+foo : Int
+let foo = 42
+
+: Int # Или без имени, тогда применится к след. функции
+let bar = foo + 42
+
+: Int -> Int
+let baz = a -> a + 42
+
+fred : Int -> Int
+let fred = baz 42 + foo
+
+: (Int, Int) -> Int # Pair literal
+let aboba = a, b -> a + b
+
+let baza = foo + bar - baz 42 * fred - aboba (40, 2)
+
+
+
+
 handle_query_result : (Result (String, String), String) -> IO String
 let handle_query_result = result, query_name ->
     match result of
@@ -56,7 +76,22 @@ let req map = f, l ->
         [x, ..xs] -> {
         ^- a ^- List a
             let y = f x # x: NonLin, так как в List a, где a: NonLin
-            let ys, xs' = map f xs
+            let ys, xs' = map (f, xs)
             ([y, ..ys], [x, ..xs'])
         }
 
+
+loop : (() -> a) -> IO ()
+let rec loop = action -> {
+    action  # side-effect
+    loop action
+}
+
+: IO ()
+let main = loop $ \ -> io.puts "Hello, World!" # lambda with () (Unit) param doesnt need explicit parenthesis
+
+: IO ()
+let do_work = {
+    io.puts "Hello"
+    io.puts ", World"
+}

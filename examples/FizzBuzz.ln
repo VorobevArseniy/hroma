@@ -1,0 +1,21 @@
+module fizzbuzz
+
+import (
+    "linea/lists"
+    "linea/io"
+    "linea/strings"
+)
+
+main : IO ()
+let main = [1, ..100]
+    |> lists.map fizz_buzz
+    |> strings.join_with ","
+    |> io.puts
+
+: Int -> String
+let fizz_buzz = n -> match (n % 3 == 0, n % 5 == 0) of
+    (true, true) -> "FizzBuzz"
+    (true, false) -> "Fizz"
+    (false, true) -> "Buzz"
+    (false, false) -> show n
+    

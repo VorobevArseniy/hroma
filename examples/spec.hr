@@ -2,12 +2,12 @@
 module main
 
 # Импортируем стандартный модуль
-import hroma/io 
+import linea/io 
 # Если импортов несколько:
 # import (
-#   hroma/io
-#   hroma/lists
-#   hroma/files
+#   linea/io
+#   linea/lists
+#   linea/files
 # )
 #
 
@@ -28,11 +28,11 @@ let main = {
 }
 
 ---
-# В Hroma все значения - это функции
+# В Linea все значения - это функции
 # Для создания функции используется ключевое слово let:
 let foo = 42 # Создает функции foo (), которая возвращает 42
 
-# В Hroma функции могут принимать только один аргумент
+# В Linea функции могут принимать только один аргумент
 : Int -> Int # Nameless bind - сигнатура применится к следующей функции
 let bar = x -> x + 42
 
@@ -44,27 +44,37 @@ sum (40, 2)
 
 
 # Синтаксис многострочных функций (императивный стиль)
-: () -> Int
+:  Int
 let multiline_fn = {
     let foo = 24
     let bar = foo * 2
 
-    bar # В Hroma нет ключего слова return, как во многих ЯП
+    bar # В Linea нет ключего слова return, как во многих ЯП
 }
 
-# Линейность в Hroma:
-
+# Линейность в Linea:
 let some_fn = {
     let foo = files.open "foo.txt"
 
-    let line1, _  = files.get_line (foo, 1)
-    let line2, _ = files.get_line (foo , 2) # foo использован дважды!
-
+    let foo_line1, _  = files.get_line (foo, 1)
+    let foo_line2, _ = files.get_line (foo , 2) # foo использован дважды!
     # Правильным будет:
     # let line1, foo2 = files.get_line (foo, 1)
     # let line2, _ = files.get_line (foo2, 2)
 
-    (line1, line2)
+    let bar = files.open "bar.txt"
+    drop bar # bar поглощен
+    drop bar # Ошибка, bar использован дважды! (Double free)
+
+    let baz = files.open "baz.txt"
+    drop baz # baz поглощен
+    let baz_line = files.get_line (baz, 1) # Ошибка, baz использован дважды! (Use after free)
+
+    let zab_line = "zab.txt"
+        |> files.open
+        |> files.getline 1 # Файл будет закрыт в конце pipe-цепочки
+
+    (foo_line1, foo_line2)
 } # В языке есть RAII, поэтому файл вручную закрывать не надо
 
 # Многие стандартные примитивные типы имеют NonLin trait
@@ -79,37 +89,45 @@ let bar = foo + foo # Они удаляются из памяти нетриви
 
 # Анонимные функции:
 
-\ -> {...} # Анонимная функция с Unit параметром
-
 \x -> {...} # Анонимная функция с параметром
+
+# Коллбэки в параметрах 
+
+fn_with_callback : (Int -> Int) -> Int
+let fn_with_callback = callback -> callback 40
+
+: Int -> Int
+let my_callback = x -> x + 2
+
+# Then just pass it:
+let foo = fn_with_callback my_callback # 42
+
+# Or use anonymus (lambda) function
+let bar = fn_with_callback \x -> x + 2 # 42
+
 
 ---
 
 ---
 
 # Типы данных:
-# В Hroma есть ряд встроенных типов: Int, Float, String, Bool, List T, Result (T, E), Record{}, Pair (A, B) и другие
+# В Linea есть ряд встроенных типов: Int, Float, String, Bool, List T, Result (T, E), Record{}, Pair (A, B) и другие
 
 # Records:
-# создать запись можно с помощью литерала {}:
-let my_record = {foo: 42, bar: "42"} # В таком случае тип записи выведется автоматически 
-#   ^-- () -> Record{foo: Int, bar: String}
-#
-# Получить данные записи можно через . :
-let foo = my_record.foo 
-#   ^-- () -> Int
-#
-# Если запись нелинейна, то получать ее данные таким образом можно несколько раз
-# Если запись линейна, то получение ее данных таким образом поглотит саму запись, и получить другие данные не получится
-# Если надо получить все данные линейной записи, то необходимо воспользоваться pattern matching:
-let lin_record = LinRecord {foo: LinType, bar: LinType}
+# Для того: чтобы создать запись надо определить ее тип:
 
-: LinRecord -> ...
-let baz = lr ->
-    match lr of
-        LinRecord {foo, bar} -> {...}
 
-baz lin_record # линейный ресурс поглощен
+let type MyRecord = {
+    MyRecord {foo: Int, bar: String} # Вариант не обязательно должен называться так же, как и ADT
+} deriving (Drop)
+
+let my_record = MyRecord {foo: 42, bar: "42"}
+
+# Использовать запись можно с помощью pattern matching:
+let foo = match my_record of
+    MyRecord {foo, bar} -> io.puts ((show foo) <> bar)
+
+
 
 # Type alias
 
@@ -117,7 +135,7 @@ baz lin_record # линейный ресурс поглощен
 let req factorial = n, cont -> 
     match n of
         0 -> cont 1
-        _ -> factorial (n - 1, \result -> cont $ n * result)
+        _ -> factorial (n - 1, \r -> cont (n * r))
 # Удобнее будет вынести в отдельный alias тип:
 let type Cont = Int -> Int
 
@@ -151,7 +169,7 @@ let type MyADT = {
     Foo {data: String, another_data: String} 
     Bar (Int, String)
     Baz List Int
-}
+} deriving (Drop) # Без этого необходимо вручную реализовать Drop trait
 
 : MyRecordType -> IO String
 let handle_record = record -> 
@@ -167,7 +185,7 @@ handle_my_record $ Bar ("bar", 42) # >> Baz?: bar
 ---
 # Математические операторы:
 
-# Операторы в Hroma не имеют перегрузок:
+# Операторы в Linea не имеют перегрузок:
 # Операторы для Int: 
 # Арифметические: [+, -, /, *, %]
 # Операторы сравнения: [<, >, >=, <=, ==]
@@ -193,10 +211,10 @@ let list = [0, 1, 2] # Это функция, которая создаст сп
 # Такой список будет иметь тип List Int
 # List не реализует NonLin trait
 
-# Hroma имеет встроенные функции для работы со списками в модуле hroma/lists:
+# Linea имеет встроенные функции для работы со списками в модуле linea/lists:
 let list = [42, 42, 42]
 
-let len, list = lists.len list1 # Так как в Hroma списки линейны, после использования в функции len
+let len, list = lists.len list1 # Так как в Linea списки линейны, после использования в функции len
 # list будет недоступен. Поэтому len (как и многие другие функции) возвращает заново новую функцию с исходным списком
 # Если вам не нужна функция со списком обратно вы можете сделать let len, _ = len list
 ---
@@ -231,7 +249,7 @@ io.puts $
     _, _ -> "Neither cat nor dog"
 
 # pattern matching строк:
-let string = "Hello, Hroma"
+let string = "Hello, Linea"
 : String -> String
 let get_name = x ->
     match x of # String не имеет Copy trait
@@ -259,7 +277,7 @@ io.puts $ match_list list # >> "Список начинается с 1, зака
 ---
 
 # Tuple (Pair)
-# В Hroma вы часто будете сталкиваться с тем, что функция возращает 2 функции -> результат и функцию обратно
+# В Linea вы часто будете сталкиваться с тем, что функция возращает 2 функции -> результат и функцию обратно
 : (Int, Int) -> (Int, Int)
 let f = a, b -> (b, a + 1) # Тип (Int, Int)
 
@@ -294,14 +312,14 @@ io.puts len
 
 ---
 # Трейты (Traits):
-# В Hroma есть система трейтов для ADT типов.
+# В Linea есть система трейтов для ADT типов.
 # Один из стандартных трейтов это NonLin
 
 # Для того, чтобы использовать NonLin, каждый вариант ADT должен содержать только нелинейные типы:
 let type NonLinADT = {
     Foo
     Bar String
-    Baz {foo: Int, bar: String} # Все варианты имеют нелинейные типы
+    Baz {foo: Int, bar: String} # Все варианты реализуют NonLin трейт
 } deriving (NonLin) # Для такого типа будет автоматический нетривиальный drop
 
 main : IO String
@@ -319,7 +337,7 @@ let type Resource = {
     Resource {id: String} 
 }
 
-# Если тип не реализует NonLin trait, то ему необходимо вручную реализовать Drop trait
+# Если тип не реализует NonLin или Drop trait, то ему необходимо вручную реализовать Drop trait
 impl Drop for LinResource = {
     drop = { id } ->
         unsafe_drop_resource id
@@ -329,9 +347,9 @@ impl Drop for LinResource = {
 : Resource -> Int
 let use_resource = res ->
     match res of
-        { foo } -> foo + 42
+        Resource { foo } -> foo + 42
 
-main : () -> IO String
+main : IO ()
 let main = {
     let my_resource = Resource {id: 42}
 
@@ -350,10 +368,10 @@ let type Foo = {
 } 
 
 impl Show for Foo = {
-    show = a, b -> a <> " and " <> b
+    let show = a, b -> a <> " and " <> b
 }
 
-: () -> IO String
+: IO ()
 let main = {
     let my_foo = Foo ("baz", "bar")
 
@@ -363,10 +381,11 @@ let main = {
 }
 
 # Traits для полиморфных параметров (generics) (на будущее):
-let type Result (T, E) = {
+let type Result T, E = {
     Ok T
     Err E    
 }
 # Если оба параметра нелинейны, то результат является нелинейным
-auto NonLin for Result T E where T: NonLin, E: NonLin
+auto NonLin for Result T, E where T: NonLin, E: NonLin
 # Если все параметры реализуют один и тот же трейт, то можно писать так:
+auto Drop for Result T, E where T: NonLin, E: NonLin

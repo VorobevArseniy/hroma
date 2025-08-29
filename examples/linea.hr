@@ -1,0 +1,50 @@
+# --- Constants as Functions ---
+# A "constant" is just a function that ignores its Unit argument.
+greeting : () -> String
+let greeting = "Hello World!"
+
+# The signature can be simplified. This means the same: a function that returns a String.
+greeting_short : String
+let greeting_short = "Hello World!"
+
+# To get the value, you must "call" the function by providing Unit
+: IO ()
+let main = io.puts greeting # `greeting` is applied to `()` implicitly here.
+# io.puts greeting_short would work exactly the same.
+
+
+# --- Functions with Parameters ---
+# A function that takes an Int and returns an Int.
+increment : Int -> Int
+let increment = n -> n + 1
+
+# A multi-line function. It's a function that takes Unit and returns an Int.
+# The last expression (`a + b`) is its return value.
+complex_calculation : Int
+let complex_calculation = {
+    : Int
+    let a = 5   # This is a function: () -> Int
+
+    : Int
+    let b = 37  # This is also a function: () -> Int
+
+    a + b       # This calls both functions and adds their results.
+}
+
+# --- Higher-Order Functions ---
+# A function that takes another function `f` as an argument.
+apply_to_40 : (Int -> Int) -> Int
+let apply_to_40 = f -> f 40 # Apply the function `f` to the value 40.
+
+# Usage with an anonymous function (lambda).
+result1 : Int
+let result1 = apply_to_40 \n -> n + 2 # Result: 42
+
+# Usage with a named function.
+: Int -> Int
+let add_two = n -> n + 2
+
+result2 : Int
+let result2 = apply_to_40 add_two # Result: 42
+
+
